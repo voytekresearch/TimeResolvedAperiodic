@@ -1,0 +1,5 @@
+# DS store files
+.DS_Store
+
+# python check in files
+.ipynb_checkpoints
