@@ -3,3 +3,6 @@
 
 # python check in files
 .ipynb_checkpoints
+
+# env files
+.env
