@@ -1,8 +1,14 @@
 """
 Figure for Reccomendation 2: Generate high signal-to-noise power spectra.
-a, Smoothing / transforming data
-b, Windowing and padding
-c, Computing spectra for short time windows
+* Smoothing / transforming data
+    a, Bandpass filter
+    b, Interpolation
+* Windowing and padding
+    c, Windowing
+    d, Padding
+    e, Windowing + padding
+* Computing spectra for short time windows
+    f, Multitaper method
 """
 
 # SET-UP #######################################################################
@@ -12,10 +18,11 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy.interpolate import interp1d
 from scipy.signal import get_window
 
-
+from specparam.utils.spectral import interpolate_spectrum
 from neurodsp.sim import sim_combined
 from neurodsp.utils import create_times
 from neurodsp.spectral import compute_spectrum
@@ -24,11 +31,15 @@ from neurodsp.filt import filter_signal
 # settings - figure
 FIGSIZE = [5, 7]
 plt.style.use('mplstyle/nature_reviews.mplstyle')
+PANEL_FONTSIZE = 12 # for panel labels
 
 # settings - panel b
 FS = 500 # sampling frequency
 N_SECONDS = 2 # signal duration
 PAD_FRACTION = 0.2 # pad duration / signal duration
+
+# set random seed
+np.random.seed(0)
 
 # MAIN #########################################################################
 
@@ -37,20 +48,22 @@ def main():
     # create figure and gridspec
     fig = plt.figure(figsize=FIGSIZE, constrained_layout=True)
     spec = gridspec.GridSpec(figure=fig, ncols=1, nrows=6, 
-                             height_ratios=[0.02, 0.8, 0.02, 0.8, 0.02, 1])
+                             height_ratios=[0.02, 1, 0.02, 1.5, 0.02, 1.2])
 
-    # plot panels a and b
-    plot_panel_a(fig, spec[1], fs=1200) 
-    plot_panel_b(fig, spec[3], fs=FS, n_seconds=N_SECONDS, 
-                 pad_length=int(N_SECONDS*FS*PAD_FRACTION))
+    # plot panels a-e
+    plot_panel_ab(fig, spec[1], fs=1200) 
+    plot_panel_cde(fig, spec[3], fs=FS, n_seconds=N_SECONDS, 
+                   pad_length=int(N_SECONDS*FS*PAD_FRACTION))
     
-    # plot panel c: Cohen, 2014
+    # plot panel f: Cohen, 2014
     panel_c_path = "notebooks/images/cohen_2014_multitaper.png"
     ax_c = fig.add_subplot(spec[5])
-    ax_c.imshow(plt.imread(panel_c_path), aspect='auto')
+    img = plt.imread(panel_c_path)[..., :3] # drop transparency
+    img = (img - img.min(axis=(0,1))) / (img.max(axis=(0,1)) - img.min(axis=(0,1))) # sharpen image
+    ax_c.imshow(img)
     ax_c.axis('off')
 
-    # add subplot titles
+    # add panel titles
     titles = ["Smoothing / transforming data", 
               "Windowing and padding", 
               "Multitaper method"]
@@ -59,17 +72,25 @@ def main():
         ax_title.set_title(title, fontsize=12, pad=0)
         ax_title.axis("off")
 
+    # add panel labels
+    fig.text(0.01, 0.95, 'a', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.51, 0.95, 'b', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.01, 0.67, 'c', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.51, 0.67, 'd', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.15, 0.45, 'e', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.01, 0.29, 'f', fontsize=PANEL_FONTSIZE, fontweight='bold')
+
     # save/show
     fig.savefig(os.path.join('figures', 'figure_2.png'))
-    plt.show()
+    # plt.show()
 
 
-def plot_panel_a(fig, subplot_spec, fs, n_seconds=10):
+def plot_panel_ab(fig, subplot_spec, fs, n_seconds=10):
     # create nested subgridspec
     spec = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=subplot_spec, 
                                             width_ratios=[1, 1])
-    ax_0 = fig.add_subplot(spec[0, 0])
-    ax_1 = fig.add_subplot(spec[0, 1])
+    ax_a = fig.add_subplot(spec[0, 0])
+    ax_b = fig.add_subplot(spec[0, 1])
 
     # simulate signal (aperiodic activity + line noise)
     sim_components = {'sim_powerlaw': {'exponent' : -2},
@@ -78,42 +99,40 @@ def plot_panel_a(fig, subplot_spec, fs, n_seconds=10):
                           components=sim_components, 
                           component_variances=[1, 0.5, 0.1])
 
-    # apply bandpass filter
+    # apply bandstop filter
     signal_mfilt = signal.copy()
     for center_freq in [60, 120]:
         signal_mfilt = filter_signal(signal_mfilt, fs=fs, pass_type='bandstop',
-                                      f_range=[center_freq-3, center_freq+3],
-                                      butterworth_order=3)
+                                     f_range=[center_freq-3, center_freq+3],
+                                     filter_type='iir', butterworth_order=3)
 
     # compute power spectra
     freqs, psd = compute_spectrum(signal, fs=fs, method='welch')
     _, psd_mfilt = compute_spectrum(signal_mfilt, fs=fs, method='welch')
 
     # interpolate spectrum
-    psd_interp = interp_spectra(freqs, psd, f_range=[58, 62])
-    psd_interp = interp_spectra(freqs, psd_interp, f_range=[118, 122])
+    _, psd_interp = interpolate_spectrum(freqs, psd, [58, 62])
+    _, psd_interp = interpolate_spectrum(freqs, psd_interp, [118, 122])
 
     # plot
-    ax_0.loglog(freqs, psd, color='k', alpha=0.5, label='raw signal')
-    ax_0.loglog(freqs, psd_mfilt, color='b', alpha=0.5, label='filtered signal')
-    ax_1.loglog(freqs, psd, color='k', alpha=0.5, label='original psd')
-    ax_1.loglog(freqs, psd_interp, color='g', alpha=0.5, label='interpolated psd')
+    ax_a.loglog(freqs, psd, color='k', alpha=0.5, label='raw signal')
+    ax_a.loglog(freqs, psd_mfilt, color='b', alpha=0.5, label='filtered signal')
+    ax_b.loglog(freqs, psd, color='k', alpha=0.5, label='original psd')
+    ax_b.loglog(freqs, psd_interp, color='b', alpha=0.5, label='interpolated psd')
 
     # label
-    ax_0.set_title('Bandpass filter')
-    ax_1.set_title('Interpolation')
-    ax_0.legend()
-    ax_1.legend()
+    ax_a.set_title('Bandstop filter')
+    ax_b.set_title('Interpolation')
 
-    for ax in [ax_0, ax_1]:
+    for ax in [ax_a, ax_b]:
         ax.set(xlabel='frequency (Hz)', ylabel='power (au)')
+        ax.legend()
 
-   # beautify
-    for ax in [ax_0, ax_1]:
+        # beautify
         remove_spines(ax)
 
 
-def plot_panel_b(fig, subplot_spec, fs, n_seconds, pad_length):
+def plot_panel_cde(fig, subplot_spec, fs, n_seconds, pad_length):
     """
     a, signal
     b, windowed signal
@@ -123,11 +142,14 @@ def plot_panel_b(fig, subplot_spec, fs, n_seconds, pad_length):
 
     # create nested subgridspec
     spec = gridspec.GridSpecFromSubplotSpec(4, 2, subplot_spec=subplot_spec, 
-                                            height_ratios=[1, 1, 1, 1],
-                                            width_ratios=[2, 1])
-    axes = np.array([fig.add_subplot(spec[i,0]) for i in range(4)])
-    for ax in axes[1:-1]:
-        ax.sharex(axes[0])
+                                            height_ratios=[1, 1, 1, 6],
+                                            width_ratios=[1, 1])
+    ax_c_0 = fig.add_subplot(spec[0, 0])
+    ax_c_1 = fig.add_subplot(spec[1, 0])
+    ax_c_2 = fig.add_subplot(spec[2, 0])
+    ax_d_0 = fig.add_subplot(spec[0, 1])
+    ax_d_1 = fig.add_subplot(spec[1, 1])
+    ax_d_2 = fig.add_subplot(spec[2, 1])
 
     # simulate signal (oscillation + aperiodic activity)
     sim_components = {'sim_powerlaw': {'exponent' : -2},
@@ -136,55 +158,69 @@ def plot_panel_b(fig, subplot_spec, fs, n_seconds, pad_length):
                           components=sim_components, 
                           component_variances=[1, 0.5, 0.2])
     time = create_times(n_seconds=n_seconds, fs=fs)
-    axes[0].plot(time, signal, color='k')
+    ax_c_0.plot(time, signal, color='k')
+    ax_d_0.plot(time, signal, color='k')
 
-    # pad signal (mirror-padding)
-    signal_pad = np.concatenate((np.flip(signal[:pad_length]), signal, 
-                                 np.flip(signal[-pad_length:])))
-    time_pad = create_times(n_seconds=(len(signal) / fs) + (pad_length * 2 / fs), 
-                        fs=fs, start_val=-pad_length / fs)
-    axes[2].plot(time_pad[pad_length-1:-pad_length-1], 
-            signal_pad[pad_length-1:-pad_length-1], color='k')
-    axes[2].plot(time_pad[:pad_length], signal_pad[:pad_length], color='r')
-    axes[2].plot(time_pad[-pad_length:], signal_pad[-pad_length:], color='r')
-
-    # window signals (orignal and padded)
+    # c, window signal
     window = get_window('hann', len(signal))
     signal_w = signal * window
-    signal_pw = signal_pad * get_window('hann', len(signal_pad))
-    axes[1].plot(time, signal_w, color='k')
-    axes[1].plot(time, window, color='b', alpha=0.5)
-    axes[3].plot(time_pad, signal_pw, color='g')
+    ax_c_1.plot(time, window, color='b')
+    ax_c_2.plot(time, signal_w, color='k')
+
+    # d, pad signal (mirror-padding and zero-padding)
+    time_pad = create_times(n_seconds=(len(signal) / fs) + (pad_length * 2 / fs), 
+                            fs=fs, start_val=-pad_length / fs)
+    signal_pad_m = np.concatenate((np.flip(signal[:pad_length]), signal,
+                                   np.flip(signal[-pad_length:])))
+    signal_pad_z = np.concatenate((np.zeros(pad_length), signal,
+                                   np.zeros(pad_length)))
+
+    for signal_pad, ax in zip([signal_pad_m, signal_pad_z],
+                              [ax_d_1, ax_d_2]):
+        ax.plot(time_pad[pad_length-1:-pad_length-1], 
+                signal_pad[pad_length-1:-pad_length-1], color='k')
+        ax.plot(time_pad[:pad_length], signal_pad[:pad_length], color='b')
+        ax.plot(time_pad[-pad_length:], signal_pad[-pad_length:], color='b')
+
+    # e, window padded signal
+    signal_pw = signal_pad_m * get_window('hann', len(signal_pad_m))
+    spec_e = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=spec[3, :],
+                                              width_ratios=[0.2, 1, 0.2])
+    ax_e = fig.add_subplot(spec_e[0, 1])
+    ax_e.plot(time_pad, signal_pw, color='k')
+
+    # share axis
+    for ax in [ax_c_1, ax_c_2]:
+        ax.sharex(ax_c_0)
+    for ax in [ax_d_1, ax_d_2]:
+        ax.sharex(ax_d_0)
 
     # label
-    axes[0].set_title('Time-series')
-    axes[-1].set_xlabel('time (s)')
-    axes[2].set_ylabel('             voltage (au)')
+    for ax in [ax_c_2, ax_d_2, ax_e]:
+        ax.set_xlabel('time (s)')
+    for ax in [ax_c_1,  ax_d_1, ax_e]:
+        ax.set_ylabel('voltage (au)')
 
     # remove clutter
-    for ax in axes:
+    for ax in [ax_c_0, ax_c_1, ax_c_2, ax_d_0, ax_d_1, ax_d_2, ax_e]:
         ax.set_yticks([])
-    for ax in axes[:-1]:
-        ax.set_xticks([])
+    for ax in [ax_c_0, ax_c_1, ax_d_0, ax_d_1]:
+        ax.tick_params(axis='x', which='both', labelbottom=False)
+    for ax in [ax_c_2, ax_d_2]:
+        ax.tick_params(axis='x', which='both', labelbottom=True)
 
-    # compute power spectra
-    freqs, psd = compute_spectrum(signal, fs=fs, method='welch')
-    # _, psd_w = compute_spectrum(signal_w, fs=fs, method='welch')
-    # _, psd_p = compute_spectrum(signal_pad, fs=fs, method='welch')
-    freqs_pw, psd_pw = compute_spectrum(signal_pw, fs=fs, method='welch')
-    ax_psd = fig.add_subplot(spec[:, 1])
-    ax_psd.loglog(freqs, psd, color='k', alpha=0.5, label='original signal')
-    # ax_psd.loglog(freqs, psd_w, color='b', alpha=0.5, label='windowed signal')
-    # ax_psd.loglog(freqs_pw, psd_p, color='r', alpha=0.5, label='padded signal')
-    ax_psd.loglog(freqs_pw, psd_pw, color='g', alpha=0.5, label='pad + window')
-    ax_psd.legend()
-    ax_psd.set(xlabel='frequency (Hz)', ylabel='power (au)', 
-               title='Power spectra')
+    # add titles
+    ax_c_0.set_title('Signal')
+    ax_c_1.set_title('Window (Hanning)')
+    ax_c_2.set_title('Windowed signal')
+    ax_d_0.set_title('Signal')
+    ax_d_1.set_title('Padded signal (mirror)')
+    ax_d_2.set_title('Padded signal (zero)')
+    ax_e.set_title('Windowed padded signal')
 
     # beautify
-    for ax in axes:
+    for ax in [ax_c_0, ax_c_1, ax_c_2, ax_d_0, ax_d_1, ax_d_2, ax_e]:
         remove_spines(ax)
-    remove_spines(ax_psd)
 
 
 def remove_spines(ax):
@@ -193,27 +229,6 @@ def remove_spines(ax):
     """
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-
-
-def interp_spectra(freqs, spectra, f_range):
-
-    # Build mask for the band
-    freq_mask = (freqs >= f_range[0]) & (freqs <= f_range[1])
-    temp_x = freqs[~freq_mask]
-    temp_y = spectra[~freq_mask]
-
-    # Prepare data for interpolation
-    x_log = np.log10(temp_x)
-    y_log = np.log10(temp_y)
-    xi = np.log10(freqs[freq_mask])
-    f_interp = interp1d(x_log, y_log, kind='linear', bounds_error=True, assume_sorted=True)
-    yi = f_interp(xi)
-    y_new = 10 ** yi
-
-    spectrum_interp = spectra.copy()
-    spectrum_interp[freq_mask] = y_new
-
-    return spectrum_interp
 
 
 if __name__ == "__main__":
