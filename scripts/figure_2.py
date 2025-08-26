@@ -26,10 +26,13 @@ from neurodsp.utils import create_times
 from neurodsp.spectral import compute_spectrum
 from neurodsp.filt import filter_signal
 
+import sys
+sys.path.append('code')
+from plt_utils import remove_spines, PANEL_FONTSIZE
+
 # settings - figure
-FIGSIZE = [5, 7]
-PANEL_FONTSIZE = 12 # for panel labels
 plt.style.use('mplstyle/nature_reviews.mplstyle')
+FIGSIZE = [5, 7]
 
 # settings - panel c-e
 FS = 500 # sampling frequency
@@ -218,14 +221,6 @@ def plot_panel_cde(fig, subplot_spec, fs, n_seconds, pad_length):
     # beautify
     for ax in [ax_c_0, ax_c_1, ax_c_2, ax_d_0, ax_d_1, ax_d_2, ax_e]:
         remove_spines(ax)
-
-
-def remove_spines(ax):
-    """
-    Remove the top and left spines from a matplotlib axis.
-    """
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
 
 
 if __name__ == "__main__":
