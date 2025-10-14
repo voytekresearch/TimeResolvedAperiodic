@@ -20,7 +20,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.signal import get_window
 
-from specparam.utils.spectral import interpolate_spectrum
+import fooof
+from fooof.utils import interpolate_spectrum
 from neurodsp.sim import sim_combined
 from neurodsp.utils import create_times
 from neurodsp.spectral import compute_spectrum
@@ -30,6 +31,7 @@ import sys
 sys.path.append('code')
 from plt_utils import remove_spines, PANEL_FONTSIZE
 
+savepath = 'C:\\Users\\dillc\\OneDrive\\UCSD\\Voytek_Lab\\code_dev\\AperiodicMethods\\notebooks\\images\\'
 # settings - figure
 plt.style.use('mplstyle/nature_reviews.mplstyle')
 FIGSIZE = [5, 7]
@@ -70,19 +72,19 @@ def main():
               "Multitaper method"]
     for ii, title in enumerate(titles):
         ax_title = fig.add_subplot(spec[ii*2])
-        ax_title.set_title(title, fontsize=12, pad=0)
+        ax_title.set_title(" ", fontsize=12, pad=0)
         ax_title.axis("off")
 
     # add panel labels
-    fig.text(0.01, 0.95, 'a', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.51, 0.95, 'b', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.01, 0.67, 'c', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.51, 0.67, 'd', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.15, 0.45, 'e', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.01, 0.29, 'f', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.01, 0.95, 'A', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.51, 0.95, 'B', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.01, 0.67, 'C', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.51, 0.67, 'D', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.15, 0.445, 'E', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    fig.text(0.01, 0.29, 'F', fontsize=PANEL_FONTSIZE, fontweight='bold')
 
     # save/show
-    fig.savefig(os.path.join('figures', 'figure_2.png'))
+    fig.savefig(os.path.join(savepath, 'figure_2.png'))
 
 
 def plot_panel_ab(fig, subplot_spec, fs, n_seconds=10):
@@ -106,14 +108,24 @@ def plot_panel_ab(fig, subplot_spec, fs, n_seconds=10):
                                      f_range=[center_freq-3, center_freq+3],
                                      filter_type='iir', butterworth_order=3)
 
-    # compute power spectra
-    freqs, psd = compute_spectrum(signal, fs=fs, method='welch')
-    _, psd_mfilt = compute_spectrum(signal_mfilt, fs=fs, method='welch')
+    # # compute power spectra
+    # freqs, psd = compute_spectrum(signal, fs=fs, method='welch')
+    # _, psd_mfilt = compute_spectrum(signal_mfilt, fs=fs, method='welch')
+
+    # fm_wNoise = fooof.FOOOF()
+    # fm_wNoise.fit(freqs, psd, freq_range=[1,150])
+    # fm_wNoise._ap_fit
 
     # interpolate spectrum
     _, psd_interp = interpolate_spectrum(freqs, psd, [58, 62])
     _, psd_interp = interpolate_spectrum(freqs, psd_interp, [118, 122])
 
+    # fm_interp = fooof.FOOOF()
+    # fm_interp.fit(freqs, psd_interp, freq_range=[1,150])
+    # # fm_wNoise._ap_fit
+    # fm_filt = fooof.FOOOF(max_n_peaks=0)
+    # fm_filt.fit(freqs, psd_mfilt, freq_range=[1,150])
+    
     # plot
     ax_a.loglog(freqs, psd, color='k', alpha=0.5, label='raw signal')
     ax_a.loglog(freqs, psd_mfilt, color='b', alpha=0.5, label='filtered signal')
