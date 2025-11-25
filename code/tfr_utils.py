@@ -43,6 +43,7 @@ def plot_evoked_tfr(tfr, freqs, time, title=None, annotate_time=0,
     event-related dynamics. Power values are z-scored across time, then
     the average baseline power is subtracted before plotting.
     """
+    cmap = 'PiYG'#'coolwarm'
 
     # normalize power at each frequency by taking z-score across time
     tfr  = zscore_tfr(tfr)
@@ -55,10 +56,10 @@ def plot_evoked_tfr(tfr, freqs, time, title=None, annotate_time=0,
         fig, ax = plt.subplots(1,1, figsize=[7.5, 3], constrained_layout=True)
 
     # plot normalized spectrogram
-    ax.pcolormesh(time, freqs, tfr, cmap='coolwarm', shading='auto',
+    ax.pcolormesh(time, freqs, tfr, cmap=cmap, shading='auto',
                   norm=TwoSlopeNorm(vcenter=0))
     ax.set(xlabel="time (s)", ylabel="frequnecy (Hz)")
-    fig.colorbar(ax.pcolormesh(time, freqs, tfr, cmap='coolwarm', 
+    fig.colorbar(ax.pcolormesh(time, freqs, tfr, cmap=cmap, 
                                norm=TwoSlopeNorm(vcenter=0)), ax=ax,
                                label="normalized power (au)")
     
