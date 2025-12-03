@@ -48,20 +48,24 @@ FIGSIZE = [FIGURE_WIDTH+2, 10]
 # TIME_POINTS = [-0.35, -0.25, -0.15, 1.35] # which to plot
 # COLORS = sns.color_palette("Greens", len(TIME_POINTS))
 TITLE_FONTSIZE = PANEL_FONTSIZE - 5
-# sns.set_context('talk')
+sns.set_context('talk')
 
 # settings - simulation parameters
-N_SECONDS = 2 # signal duration (s)
-T_MIN = -0.5 # start time (s)
+N_SECONDS = 5 # signal duration (s)
 FS = 1000 # sampling frequency (Hz)
-EXPONENT = -2.5 # baseline exponent
-DELTA_EXP = -1 # task-evoked change in exponent (negative for flattening)
-F_ROTATION = 45 # rotation frequency (Hz)
+EXPONENT = -1.5 # baseline exponent
+DELTA_EXP = 1.5 # task-evoked change in exponent (negative for flattening, pos for steepening)
+F_ROTATION = 35 # rotation frequency (Hz)
+OSC_FREQ = 20 # freq of osc rhythm
+DELTA_OSC_AMP = 1.20 # how much we'll increase the osc amp for the post-stim signal
+TIMESERIES_YLIM = (-25, 25) # yaxis lim for timeseries plot
+BAR_YLIM = (0,100) # yaxis bounds for barplot
+PSD_YLIM = (-0.16525260077205794, 121.47836693568351)# yaxis bounds for PSD plot
 
 # settings - fitting parameters
 SPECPARAM_SETTINGS = {
     'aperiodic_mode' : 'fixed',
-    'max_n_peaks' : 0,
+    'max_n_peaks' : 1,
     'verbose' : False,
 }
 
@@ -70,7 +74,7 @@ TFR_WINDOW = 0.3 # window length (s)
 FREQ_BANDWIDTH = 7 # frequency bandwidth (Hz)
 
 # set random seed
-np.random.seed(39)
+np.random.seed(42)
 colors_pal = (sns.color_palette('crest'))
 prestim_color = colors_pal[0]
 poststim_color = colors_pal[3]
@@ -81,8 +85,8 @@ def main():
 
     # create figure and gridspec
     fig = plt.figure(figsize=FIGSIZE, constrained_layout=True)
-    gs = gridspec.GridSpec(figure=fig, ncols=1, nrows=3, 
-                           height_ratios=[0.75, 0.5, 0.5])
+    gs = gridspec.GridSpec(figure=fig, ncols=2, nrows=4, 
+                           height_ratios=[0.75, 0.5, 0.5, 0.5])
 
     # # Add variable freq range plots
     # ax_e = gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=gs[0],
@@ -90,65 +94,62 @@ def main():
     # plot_variable_freq_ranges(fig, ax_e)
     # plot_diff_time_wins(fig, plt.subplot(ax_e[3]))
 
-    # Simulate and plot aperiodic + oscillation with events 
-    ax_a = fig.add_subplot(gs[0])
-    events = [0.75, 1.25, 3.25, 4.5]
-    event_win = 0.25
-    fs = 1000
-    sig, times = generate_modulated_signal(events, event_win, fs)
+    # Simulate and plot aperiodic + oscillation with events
+    events = [2.5]#[0.75, 1.25, 3.25, 4.5]
+    event_win = 1
+    # sig_no, times_no = generate_modulated_signal(events, event_win, FS, rotate_aper=1)
+    sig_rot, times_rot = generate_modulated_signal(events, event_win, FS, rotate_aper=1) 
+    sig_no, times_no = sig_rot, times_rot
+
+    ax_no = fig.add_subplot(gs[2])
+    ax_rot = fig.add_subplot(gs[3])
     for ev in events: 
-        ax_a.axvline(ev, color='grey', linewidth=3)
-        ax_a.axvspan(xmin = ev-event_win, xmax=ev,  color = prestim_color)
-        ax_a.axvspan(xmin = ev, xmax=ev+event_win, color = poststim_color)
-    ax_a.plot(times, sig, color='k', alpha=0.85)
+        ax_no.axvline(ev, color='grey', linewidth=3)
+        ax_no.axvspan(xmin = ev-event_win, xmax=ev,  color = prestim_color)
+        ax_no.axvspan(xmin = ev, xmax=ev+event_win, color = poststim_color)
 
-    # Compute and plot TFR
-    # ax_b = fig.add_subplot(gs[2])
-    # tfr, time_tfr, freqs = compute_and_plot_tfr(sig, fig, ax_b)
+        ax_rot.axvline(ev, color='grey', linewidth=3)
+        ax_rot.axvspan(xmin = ev-event_win, xmax=ev,  color = prestim_color)
+        ax_rot.axvspan(xmin = ev, xmax=ev+event_win, color = poststim_color)
+    # plot the timeseries    
+    ax_no.plot(times_no, sig_no, color='k', alpha=0.85)
+    ax_rot.plot(times_rot, sig_rot, color='k', alpha=0.85)
+    ax_no.set_ylim(TIMESERIES_YLIM)
+    ax_rot.set_ylim(TIMESERIES_YLIM)
 
-    # Plot spectral parameterization
-    gs_b = gridspec.GridSpecFromSubplotSpec(1, 5, subplot_spec=gs[1],
-                                            width_ratios=[1, 1, 1, 1, 1])
-    ax_b_0 = fig.add_subplot(gs_b[0])
-    ax_b_1 = fig.add_subplot(gs_b[1])
-    ax_b_2 = fig.add_subplot(gs_b[2])
-    ax_b_3 = fig.add_subplot(gs_b[3])
+    ax_no.set_xlabel('Time (s)')
+    ax_no.set_ylabel('Voltage (au)')
+    ax_rot.set_xlabel('Time (s)')
+    ax_rot.set_ylabel('Voltage (au)')
 
-    gs_c = gridspec.GridSpecFromSubplotSpec(1, 5, subplot_spec=gs[2],
-                                            width_ratios=[1, 1, 1, 1, 1])
-    ax_c_0 = fig.add_subplot(gs_c[0])
-    ax_c_1 = fig.add_subplot(gs_c[1])
-    ax_c_2 = fig.add_subplot(gs_c[2])
-    ax_c_3 = fig.add_subplot(gs_c[3])
+    # Plot PSDs
+    ax_psd_no = fig.add_subplot(gs[4])
+    ax_psd_rot = fig.add_subplot(gs[5])
 
-    axes_c = [(ax_b_0, ax_c_0), (ax_b_1, ax_c_1), (ax_b_2, ax_c_2), (ax_b_3, ax_c_3)]
-    for axs, ev in zip(axes_c, events):
-        ev_idx = int(ev*fs)
-        plot_prestim_poststim_psd(sig, ev_idx, event_win, fs, axs)
-    # ax_c_1.set_title("                                Traditional Analysis", fontsize=TITLE_FONTSIZE)
-    # for ax in [ax_c_1, ax_c_2, ax_c_3]:
-    #     ax.sharey(ax_c_0)
-    #     ax.label_outer()
-    # for ax, col in zip(axes_c, COLORS):
-    #     add_background(ax, col)
+    # Plot barplots of spectral params
+    ax_bar_no = fig.add_subplot(gs[6])
+    ax_bar_rot = fig.add_subplot(gs[7])
 
-    # # add large text elipsis
-    # ax_c_x = fig.add_subplot(gs_c[3])
-    # ax_c_x.text(0.5, 0.5, r"$\cdots$", fontsize=40, ha="center", va="center")
-    # ax_c_x.axis("off")
+    axes_list = [(ax_psd_no, ax_bar_no, sig_no, 1),(ax_psd_rot, ax_bar_rot, sig_rot, 0)]
+    ev = events[0]
+    ev_idx = int(ev*FS)
+    for ax_a, ax_b, signal, tb in axes_list:
+        axs = (ax_a, ax_b)
+        plot_prestim_poststim_psd(signal, ev_idx, event_win, FS, axs, total_bandpow = tb)
+    ax_psd_rot.set_ylim(ax_psd_no.get_ylim())
 
-    # # Compute and plot sliding window parameters
-    # ax_d = fig.add_subplot(gs[4])
-    # ax_d.set_title("Time-resolved spectral features", fontsize=TITLE_FONTSIZE)
-    # # compute_and_plot_sliding_window_params(tfr, time_tfr, freqs, ax=ax_d)
+    ax_psd_no.set_xlabel('Freq (Hz))')
+    ax_psd_no.set_ylabel('Log Power (au)')
+    ax_psd_rot.set_xlabel('Freq (Hz)')
+    ax_psd_rot.set_ylabel('Log Power (au)')
 
     # add panel labels
-    fig.text(0.01, 0.97, 'A', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.75, 0.97, 'B', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.01, 0.76, 'C', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.01, 0.60, 'D', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.01, 0.43, 'E', fontsize=PANEL_FONTSIZE, fontweight='bold')
-    fig.text(0.01, 0.25, 'F', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    # fig.text(0.01, 0.97, 'A', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    # fig.text(0.75, 0.97, 'B', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    # fig.text(0.01, 0.76, 'C', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    # fig.text(0.01, 0.60, 'D', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    # fig.text(0.01, 0.43, 'E', fontsize=PANEL_FONTSIZE, fontweight='bold')
+    # fig.text(0.01, 0.25, 'F', fontsize=PANEL_FONTSIZE, fontweight='bold')
 
     # remove spines
     # for ax in [ ax_b, *axes_c, ax_d]:
@@ -157,16 +158,21 @@ def main():
     # # Save
     fig.savefig('figures\\figure_pedagogical.png')#os.path.join('figures', 'figure_0.png'))
 
-def generate_modulated_signal(events, event_win, fs):
+def generate_modulated_signal(events, event_win, fs, rotate_aper):
 
     sim_components = {
-        "sim_powerlaw": {"exponent": -1},
-        "sim_oscillation": [{"freq": 10}],
+        "sim_powerlaw": {"exponent": EXPONENT}
     }
-    sig = sim_combined(n_seconds=5, fs=fs, components=sim_components)
-    osc_sig = (sim_oscillation(n_seconds=5, fs=fs, freq=10)*0.10)
+    sig = sim_combined(n_seconds=N_SECONDS, fs=fs, components=sim_components)
+    osc_sig = sim_oscillation(n_seconds=N_SECONDS, fs=fs, freq=OSC_FREQ)
 
-    times = create_times(n_seconds=5, fs=fs)
+    # get prestim signal as aper + osc
+    sig = (sig*2) + (osc_sig)# crank up the ratio of aper sig 
+
+    # get alpha sig which we'll add to get the poststim win
+    osc_sig_mod = (osc_sig*DELTA_OSC_AMP)
+
+    times = create_times(n_seconds=N_SECONDS, fs=fs)
 
     for ev in events:
         ev_idx = int(ev*fs)
@@ -174,14 +180,17 @@ def generate_modulated_signal(events, event_win, fs):
         print(ev_idx, ev_idx_end)
 
         mod_sig = sig[ev_idx : ev_idx_end]
-        osc_sig_add = osc_sig[ev_idx : ev_idx_end]
-        rotated = rotate_timeseries(sig=mod_sig, fs=fs, delta_exp=-1, f_rotation=40)
+        osc_sig_add = osc_sig_mod[ev_idx : ev_idx_end]
+        if rotate_aper:
+            rotated = rotate_timeseries(sig=mod_sig, fs=fs, delta_exp=DELTA_EXP, f_rotation=F_ROTATION)
+        else:
+            rotated = mod_sig
         rotated = rotated + osc_sig_add
         sig[ev_idx : ev_idx_end ] = rotated
 
     return sig, times
 
-def plot_prestim_poststim_psd(sig, ev_idx, event_win, fs, axs):
+def plot_prestim_poststim_psd(sig, ev_idx, event_win, fs, axs, total_bandpow = 0):
 
     psd_ax, bar_ax = axs
 
@@ -191,38 +200,70 @@ def plot_prestim_poststim_psd(sig, ev_idx, event_win, fs, axs):
     pows_post = pows_post[(freqs > 0.5) & (freqs < 50)]
     freqs = freqs[(freqs > 0.5) & (freqs < 50)]
 
-    alpha_mask = (freqs > 8) & (freqs <=12)
+    alpha_mask = (freqs > 18) & (freqs <=22) #changed to beta
     pre_total_power = np.mean(pows_pre[alpha_mask])
     pst_total_power = np.mean(pows_post[alpha_mask])
-    delta_total = (pst_total_power - pre_total_power)
+    delta_total = ((pst_total_power - pre_total_power) / pre_total_power)*100
 
     specpar_pre = fooof.FOOOF(**SPECPARAM_SETTINGS)
     specpar_pre.fit(freqs=freqs, power_spectrum=pows_pre, freq_range=(0.5, 50))    
     specpar_pst = fooof.FOOOF(**SPECPARAM_SETTINGS)
     specpar_pst.fit(freqs=freqs, power_spectrum=pows_post, freq_range=(0.5, 50))
 
-    flat_spec_delta = ((specpar_pst._spectrum_flat) - (specpar_pre._spectrum_flat))
-    flat_spec_delta = np.mean(flat_spec_delta[alpha_mask])
-    ap_delta = ((specpar_pst._ap_fit) - (specpar_pre._ap_fit))
-    ap_delta = np.mean(ap_delta[alpha_mask])
-
+    # put periodic and aper back into linear space
     pre_ap_fit = 10**(specpar_pre._ap_fit)
     pst_ap_fit = 10**(specpar_pst._ap_fit)
+    # pre_per_fit = 10**(specpar_pre._spectrum_flat)
+    # pst_per_fit = 10**(specpar_pst._spectrum_flat)
 
-    psd_ax.plot(freqs,pows_pre, color = prestim_color, alpha=0.85)
-    psd_ax.plot(freqs,pre_ap_fit, color = 'k', linewidth=2)
-    psd_ax.plot(freqs,pows_post, color = poststim_color, alpha=0.85)
-    psd_ax.plot(freqs,pst_ap_fit, color = 'k', linewidth=2)
-    psd_ax.axvspan(xmin=8, xmax=12, color='grey', alpha=0.5)
+    # calc % change pre to post stim
+    pre_pk_amp = specpar_pre.get_results().peak_params[0][1]
+    pst_pk_amp = specpar_pst.get_results().peak_params[0][1]
+    flat_spec_delta = ((pst_pk_amp - pre_pk_amp) / pre_pk_amp)*100
 
-    psd_ax.fill_between(
-        freqs[alpha_mask], pows_post[alpha_mask], pst_ap_fit[alpha_mask], where=(pows_post[alpha_mask] != pst_ap_fit[alpha_mask]), 
-        interpolate=True, color="#054907", alpha=0.25
-        )
+    pre_aper_exp = specpar_pre.get_results().aperiodic_params[1]
+    pst_aper_exp = specpar_pst.get_results().aperiodic_params[1]
+    ap_delta = ((pst_aper_exp - pre_aper_exp) / pre_aper_exp)*100
+
+    # flat_spec_delta = (((pst_per_fit) - (pre_per_fit)) / pre_per_fit)*100 # diff of periodic sig, normalized
+    # flat_spec_delta = np.mean(flat_spec_delta[alpha_mask])
+    # ap_delta = (((pst_ap_fit) - (pre_ap_fit)) / pre_ap_fit)*100
+    # ap_delta = np.mean(ap_delta[alpha_mask])
+
+    psd_ax.plot(freqs,pows_pre, color = prestim_color, alpha=0.85, linewidth=3)
+    psd_ax.plot(freqs,pows_post, color = poststim_color, alpha=0.85, linewidth=3)
+
+    # psd_ax.axvspan(xmin=8, xmax=12, color='grey', alpha=0.5)
+
     # psd_ax.set_xscale('log')
-    psd_ax.set_yscale('log')
+    # psd_ax.set_ylim(PSD_YLIM)
 
-    bar_ax.bar(['delta total', 'delta corr osc', 'delta aper'], height=[delta_total, flat_spec_delta, ap_delta])
+    if total_bandpow:
+        bar_ax.bar([u'Δ oscillation', u'Δ aperiodic'], height=[ delta_total, 0], color='grey')
+        # psd_ax.plot(freqs,pre_ap_fit, color = prestim_color, linewidth=1)
+        # psd_ax.plot(freqs,pst_ap_fit, color = poststim_color, linewidth=1)
+        
+        psd_ax.plot(OSC_FREQ, pows_pre[(freqs == OSC_FREQ)][0], color=prestim_color, marker='o', alpha=0.8)
+        psd_ax.plot(OSC_FREQ, pows_post[(freqs == OSC_FREQ)][0], color=poststim_color, marker='o', alpha=0.8)
+
+        # psd_ax.axvspan(xmin=OSC_FREQ-2, xmax=OSC_FREQ+2, color=prestim_color, alpha=0.5, ymax = pows_pre[(freqs == OSC_FREQ)][0])
+        # psd_ax.axvspan(xmin=OSC_FREQ-2, xmax=OSC_FREQ+2, color=poststim_color, alpha=0.5, ymax = pows_post[(freqs == OSC_FREQ)][0])
+    else:
+        psd_ax.plot(freqs,pre_ap_fit, color = prestim_color, linewidth=3, linestyle='--')
+        psd_ax.plot(freqs,pst_ap_fit, color = poststim_color, linewidth=3, linestyle='--')
+        psd_ax.fill_between(
+            freqs[alpha_mask], pows_post[alpha_mask], pst_ap_fit[alpha_mask], where=(pows_post[alpha_mask] != pst_ap_fit[alpha_mask]), 
+            interpolate=True, color=poststim_color, alpha=0.25
+            )
+        psd_ax.fill_between(
+            freqs[alpha_mask], pows_pre[alpha_mask], pre_ap_fit[alpha_mask], where=(pows_pre[alpha_mask] != pre_ap_fit[alpha_mask]), 
+            interpolate=True, color=prestim_color, alpha=0.25
+            )
+        bar_ax.bar([u'Δ oscillation', u'Δ aperiodic'], height=[ flat_spec_delta, ap_delta], color='grey')
+    # bar_ax.set_ylim(BAR_YLIM)
+    bar_ax.set_ylabel('% Power Change')
+
+    psd_ax.set_yscale('log')
 
 if __name__ == "__main__":
     main()
