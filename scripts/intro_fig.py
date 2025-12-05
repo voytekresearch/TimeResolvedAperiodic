@@ -44,7 +44,7 @@ from tfr_utils import plot_evoked_tfr
 
 # settings - figure
 plt.style.use('mplstyle/nature_reviews.mplstyle')
-FIGSIZE = [FIGURE_WIDTH+2, 10]
+FIGSIZE = [FIGURE_WIDTH+2, 17]
 # TIME_POINTS = [-0.35, -0.25, -0.15, 1.35] # which to plot
 # COLORS = sns.color_palette("Greens", len(TIME_POINTS))
 TITLE_FONTSIZE = PANEL_FONTSIZE - 5
@@ -85,8 +85,8 @@ def main():
 
     # create figure and gridspec
     fig = plt.figure(figsize=FIGSIZE, constrained_layout=True)
-    gs = gridspec.GridSpec(figure=fig, ncols=2, nrows=4, 
-                           height_ratios=[0.75, 0.5, 0.5, 0.5])
+    gs = gridspec.GridSpec(figure=fig, ncols=1, nrows=5, 
+                           height_ratios=[0.5,1, 0.5, 0.5, 0.1])
 
     # # Add variable freq range plots
     # ax_e = gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=gs[0],
@@ -95,42 +95,36 @@ def main():
     # plot_diff_time_wins(fig, plt.subplot(ax_e[3]))
 
     # Simulate and plot aperiodic + oscillation with events
+    ax_top = gridspec.GridSpecFromSubplotSpec(ncols=3, nrows=1, subplot_spec=gs[0], width_ratios=[2,5,2])
     events = [2.5]#[0.75, 1.25, 3.25, 4.5]
     event_win = 1
-    # sig_no, times_no = generate_modulated_signal(events, event_win, FS, rotate_aper=1)
-    sig_rot, times_rot = generate_modulated_signal(events, event_win, FS, rotate_aper=1) 
-    sig_no, times_no = sig_rot, times_rot
+    sig_no, times_no = generate_modulated_signal(events, event_win, FS, rotate_aper=1)
 
-    ax_no = fig.add_subplot(gs[2])
-    ax_rot = fig.add_subplot(gs[3])
+    ax_no = fig.add_subplot(ax_top[1])
     for ev in events: 
         ax_no.axvline(ev, color='grey', linewidth=3)
         ax_no.axvspan(xmin = ev-event_win, xmax=ev,  color = prestim_color)
         ax_no.axvspan(xmin = ev, xmax=ev+event_win, color = poststim_color)
-
-        ax_rot.axvline(ev, color='grey', linewidth=3)
-        ax_rot.axvspan(xmin = ev-event_win, xmax=ev,  color = prestim_color)
-        ax_rot.axvspan(xmin = ev, xmax=ev+event_win, color = poststim_color)
     # plot the timeseries    
     ax_no.plot(times_no, sig_no, color='k', alpha=0.85)
-    ax_rot.plot(times_rot, sig_rot, color='k', alpha=0.85)
     ax_no.set_ylim(TIMESERIES_YLIM)
-    ax_rot.set_ylim(TIMESERIES_YLIM)
 
     ax_no.set_xlabel('Time (s)')
     ax_no.set_ylabel('Voltage (au)')
-    ax_rot.set_xlabel('Time (s)')
-    ax_rot.set_ylabel('Voltage (au)')
 
     # Plot PSDs
-    ax_psd_no = fig.add_subplot(gs[4])
-    ax_psd_rot = fig.add_subplot(gs[5])
+    ax_mid = gridspec.GridSpecFromSubplotSpec(ncols=2, nrows=1, subplot_spec=gs[2],
+                                            width_ratios=[1,1])
+    ax_psd_no = fig.add_subplot(ax_mid[0])
+    ax_psd_rot = fig.add_subplot(ax_mid[1])
 
     # Plot barplots of spectral params
-    ax_bar_no = fig.add_subplot(gs[6])
-    ax_bar_rot = fig.add_subplot(gs[7])
+    ax_bottom = gridspec.GridSpecFromSubplotSpec(ncols=2, nrows=1, subplot_spec=gs[3],
+                                            width_ratios=[1,1])
+    ax_bar_no = fig.add_subplot(ax_bottom[0])
+    ax_bar_rot = fig.add_subplot(ax_bottom[1])
 
-    axes_list = [(ax_psd_no, ax_bar_no, sig_no, 1),(ax_psd_rot, ax_bar_rot, sig_rot, 0)]
+    axes_list = [(ax_psd_no, ax_bar_no, sig_no, 1),(ax_psd_rot, ax_bar_rot, sig_no, 0)]
     ev = events[0]
     ev_idx = int(ev*FS)
     for ax_a, ax_b, signal, tb in axes_list:
