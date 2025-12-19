@@ -396,8 +396,8 @@ def plot_diff_time_wins(fig, ax):
 
     # Plot the simulated data, in the frequency domain
     ax.loglog(freqs, (knee_psd1), label = 'Short Time Window (1s)', color=cols[0], linewidth=lw, alpha=1)
+    ax.loglog(freqs, (knee_psd2), label='Long Time Window (50s)', color=cols[2], linewidth=lw, alpha=0.75)
     ax.loglog(freqs, (knee_psd3), label = 'Medium Time Window (10s)', color=cols[1], linewidth=lw)
-    ax.loglog(freqs, (knee_psd2), label='Long Time Window (50s)', color=cols[2], linewidth=lw, alpha=0.85)
     ax.set_xlabel('frequency (log Hz)', fontsize=TITLE_FONTSIZE, weight='bold')
     ax.set_ylabel('\npower (log)', fontsize=TITLE_FONTSIZE, weight='bold')
     ax.set_xlim(-5,20)#freqs[-1]+20)
